@@ -13,13 +13,18 @@ public class QuizModel {
     private Long id;
     private String nome;
     private String senha;
+    private boolean admin;
     
     public QuizModel() {}
 
-    public QuizModel(String nome, String senha) {
+    public QuizModel(String nome, String senha, boolean admin) {
         this.nome = nome;
         this.senha = senha;
+        this.admin = false;//por padrão
     }
+    
+    public boolean getAdmin(){return admin;}
+    public void setAdmin(boolean admin) {this.admin = admin;}
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

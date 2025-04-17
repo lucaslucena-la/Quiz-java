@@ -1,9 +1,11 @@
+// Pacote da interface gráfica
 package com.QuizApp.gui;
 
-
-import com.QuizApp.dao.QuizAppDAO ;
+// Importações do DAO e do modelo de dados
+import com.QuizApp.dao.QuizAppDAO;
 import com.QuizApp.model.QuizModel;
 
+// Importações do JavaFX
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -14,81 +16,202 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.geometry.Pos;
+import javafx.scene.layout.StackPane;
 
 
+
+// Classe principal da aplicação gráfica, estendendo Application (JavaFX)
 public class QuizAppGui extends Application {
+
+    // Campos de entrada para nome e senha (ou email)
     private TextField txtNome, txtSenha;
+
+    // ListView para exibir os usuários cadastrados
     private ListView<QuizModel> listViewUsuarios;
+
+    // Lista observável que alimenta o ListView (automático ao atualizar)
     private ObservableList<QuizModel> usuariosList;
+
+    // Objeto para acessar o banco de dados (DAO)
     private QuizAppDAO quizDAO;
 
-    @Override
+    // Método principal que inicia a aplicação JavaFX
     public void start(Stage primaryStage) {
-    	quizDAO = new QuizAppDAO();
+        // Inicializa DAO
+        quizDAO = new QuizAppDAO();
         usuariosList = FXCollections.observableArrayList(quizDAO.listarTodos());
 
-        // Layout principal
-        VBox root = new VBox(10);
-        root.setPadding(new Insets(10));
+        // VBox principal
+        VBox conteudo = new VBox(15);
+        conteudo.setPadding(new Insets(20));
+        conteudo.setAlignment(Pos.CENTER);
 
-        // Painel de entrada
-        GridPane inputPane = new GridPane();
-        inputPane.setHgap(10);
-        inputPane.setVgap(10);
+        StackPane root = new StackPane(conteudo);
 
-        inputPane.add(new Label("Nome:"), 0, 0);
+        // ------------------- LOGIN PANE -------------------
+        VBox loginBox = new VBox(5);
+        loginBox.setAlignment(Pos.CENTER);
+        Label lblLogin = new Label("Login:");
         txtNome = new TextField();
-        inputPane.add(txtNome, 1, 0);
+        txtNome.setMaxWidth(200);
+        loginBox.getChildren().addAll(lblLogin, txtNome);
 
-        inputPane.add(new Label("Senha:"), 0, 1);
+        VBox senhaBox = new VBox(5);
+        senhaBox.setAlignment(Pos.CENTER);
+        Label lblSenha = new Label("Senha:");
         txtSenha = new TextField();
-        inputPane.add(txtSenha, 1, 1);
+        txtSenha.setMaxWidth(200);
+        senhaBox.getChildren().addAll(lblSenha, txtSenha);
 
-   
+        VBox inputPane = new VBox(10, loginBox, senhaBox);
+        inputPane.setAlignment(Pos.CENTER);
 
-        // Botões
-        HBox buttonPane = new HBox(10);
+        Button btnEntrar = new Button("Entrar");
+        Button btnCadastrarSe = new Button("Cadastre-se");
+
+        HBox buttonPane = new HBox(10, btnEntrar, btnCadastrarSe);
+        buttonPane.setAlignment(Pos.CENTER);
+
+        VBox loginPane = new VBox(10, inputPane, buttonPane);
+        loginPane.setAlignment(Pos.CENTER);
+
+        // ------------------- CADASTRO PANE -------------------
+        VBox cadastroPane = new VBox(10);
+        cadastroPane.setAlignment(Pos.CENTER);
+        cadastroPane.setVisible(false);
+        cadastroPane.setManaged(false); // impede que ocupe espaço quando invisível
+
+        Label lblNovoLogin = new Label("Novo login:");
+        TextField txtNovoLogin = new TextField();
+        txtNovoLogin.setMaxWidth(200);
+
+        Label lblNovaSenha = new Label("Nova senha:");
+        TextField txtNovaSenha = new TextField();
+        txtNovaSenha.setMaxWidth(200);
+
+        CheckBox chkAdmin = new CheckBox("É administrador?");
         Button btnCadastrar = new Button("Cadastrar");
-        Button btnAlterar = new Button("Alterar");
-        Button btnExcluir = new Button("Excluir");
-        buttonPane.getChildren().addAll(btnCadastrar, btnAlterar, btnExcluir);
+        Button btnVoltar = new Button("Voltar");
 
-        // ListView
-        listViewUsuarios = new ListView<>(usuariosList);
-        listViewUsuarios.setPrefHeight(300);
-        listViewUsuarios.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                txtNome.setText(newVal.getNome());
-                txtSenha.setText(newVal.getEmail());
+        cadastroPane.getChildren().addAll(lblNovoLogin, txtNovoLogin, lblNovaSenha, txtNovaSenha, chkAdmin, btnCadastrar, btnVoltar);
+
+        // ------------------- Troca de telas -------------------
+        btnCadastrarSe.setOnAction(e -> {
+            loginPane.setVisible(false);
+            loginPane.setManaged(false);
+
+            cadastroPane.setVisible(true);
+            cadastroPane.setManaged(true);
+        });
+
+        btnVoltar.setOnAction(e -> {
+            cadastroPane.setVisible(false);
+            cadastroPane.setManaged(false);
+
+            loginPane.setVisible(true);
+            loginPane.setManaged(true);
+        });
+
+        // ------------------- Ação de cadastro -------------------
+        btnCadastrar.setOnAction(e -> {
+            String nome = txtNovoLogin.getText().trim();
+            String senha = txtNovaSenha.getText().trim();
+            boolean admin = chkAdmin.isSelected();
+
+            if (!nome.isEmpty() && !senha.isEmpty()) {
+                QuizModel novoUsuario = new QuizModel(nome, senha, admin);
+                quizDAO.salvar(novoUsuario);
+                showAlert(Alert.AlertType.INFORMATION, "Cadastro", "Usuário cadastrado com sucesso!");
+
+                // Limpa os campos e volta à tela de login
+                txtNovoLogin.clear();
+                txtNovaSenha.clear();
+                chkAdmin.setSelected(false);
+                btnVoltar.fire();
+            } else {
+                showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
             }
         });
 
-        // Adiciona tudo ao layout
-        root.getChildren().addAll(inputPane, buttonPane, listViewUsuarios);
+        // ------------------- Finalização -------------------
+        conteudo.getChildren().addAll(loginPane, cadastroPane);
 
-        // Ações dos botões
-        btnCadastrar.setOnAction(e -> cadastrarUsuario());
-        btnAlterar.setOnAction(e -> alterarUsuario());
-        btnExcluir.setOnAction(e -> excluirUsuario());
-
-        // Configura a cena
-        Scene scene = new Scene(root, 400, 500);
-        primaryStage.setTitle("Gerenciamento de Usuários - JavaFX");
+        Scene scene = new Scene(root, 300, 350);
+        primaryStage.setTitle("Login do Quiz");
         primaryStage.setScene(scene);
         primaryStage.show();
     }
 
+    
+    private void cadastrarSe() {
+    	//janela secundária
+    	Stage cadastroStage =  new Stage();
+    	cadastroStage.setTitle("Cadastro de novo usuário");
+    	
+    	// Layout em grade
+        GridPane grid = new GridPane();
+        grid.setPadding(new Insets(20));
+        grid.setHgap(10);
+        grid.setVgap(10);
+        
+        // Campos
+        Label lblLogin = new Label("Login:");
+        TextField txtLogin = new TextField();
+
+        Label lblSenha = new Label("Senha:");
+        PasswordField txtSenha = new PasswordField();
+
+        CheckBox chkAdmin = new CheckBox("Administrador");
+
+        Button btnCadastrar = new Button("Cadastrar");
+        
+        // Adiciona os elementos ao GridPane
+        grid.add(lblLogin, 0, 0);
+        grid.add(txtLogin, 1, 0);
+
+        grid.add(lblSenha, 0, 1);
+        grid.add(txtSenha, 1, 1);
+
+        grid.add(chkAdmin, 1, 2);
+
+        grid.add(btnCadastrar, 1, 3);
+        
+     // Define ação do botão cadastrar
+        btnCadastrar.setOnAction(e -> {
+            String nome = txtLogin.getText().trim();
+            String senha = txtSenha.getText().trim();
+            boolean admin = chkAdmin.isSelected();
+
+            if (!nome.isEmpty() && !senha.isEmpty()) {
+                QuizModel novoUsuario = new QuizModel(nome, senha,chkAdmin.isSelected());
+                novoUsuario.setAdmin(admin); // você precisa ter esse campo no modelo!
+
+                quizDAO.salvar(novoUsuario);
+                atualizarLista(); // Atualiza a tela principal
+                showAlert(Alert.AlertType.INFORMATION, "Cadastro", "Usuário cadastrado com sucesso!");
+                cadastroStage.close(); // Fecha a janela
+            } else {
+                showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
+            }
+        });
+        
+        Scene scene = new Scene(grid, 300, 200);
+        cadastroStage.setScene(scene);
+        cadastroStage.show();
+    }
+
+    // Método para cadastrar um novo usuário
     private void cadastrarUsuario() {
         String nome = txtNome.getText().trim();
         String senha = txtSenha.getText().trim();
 
         if (!nome.isEmpty() && !senha.isEmpty()) {
             try {
-               
-                QuizModel usuario = new QuizModel(nome, senha);
+                QuizModel usuario = new QuizModel(nome, senha, false);
                 quizDAO.salvar(usuario);
-                atualizarLista();
-                limparCampos();
+                atualizarLista(); // Atualiza a ListView
+                limparCampos();   // Limpa os campos
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário cadastrado com sucesso!");
             } catch (NumberFormatException e) {
                 showAlert(Alert.AlertType.ERROR, "Erro", "Idade inválida!");
@@ -97,13 +220,18 @@ public class QuizAppGui extends Application {
             showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
         }
     }
+    
+    
+    private void fazerLogin() {
+    	
+    }
 
+    // Método para alterar um usuário já existente
     private void alterarUsuario() {
-    	QuizModel selecionado = listViewUsuarios.getSelectionModel().getSelectedItem();
+        QuizModel selecionado = listViewUsuarios.getSelectionModel().getSelectedItem();
         if (selecionado != null) {
             selecionado.setNome(txtNome.getText().trim());
             selecionado.setEmail(txtSenha.getText().trim());
-  
 
             quizDAO.atualizar(selecionado);
             atualizarLista();
@@ -114,10 +242,11 @@ public class QuizAppGui extends Application {
         }
     }
 
+    // Método para excluir um usuário
     private void excluirUsuario() {
-    	QuizModel selecionado = listViewUsuarios.getSelectionModel().getSelectedItem();
+        QuizModel selecionado = listViewUsuarios.getSelectionModel().getSelectedItem();
         if (selecionado != null) {
-        	quizDAO.excluir(selecionado);
+            quizDAO.excluir(selecionado);
             atualizarLista();
             limparCampos();
             showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário excluído com sucesso!");
@@ -126,16 +255,19 @@ public class QuizAppGui extends Application {
         }
     }
 
+    // Recarrega os dados do banco na lista da interface
     private void atualizarLista() {
         usuariosList.setAll(quizDAO.listarTodos());
     }
 
+    // Limpa os campos de texto e desmarca seleção da lista
     private void limparCampos() {
         txtNome.clear();
         txtSenha.clear();
         listViewUsuarios.getSelectionModel().clearSelection();
     }
 
+    // Mostra um alerta na tela
     private void showAlert(Alert.AlertType type, String title, String message) {
         Alert alert = new Alert(type);
         alert.setTitle(title);
@@ -144,8 +276,8 @@ public class QuizAppGui extends Application {
         alert.showAndWait();
     }
 
+    // Método principal que inicia a aplicação
     public static void main(String[] args) {
-        launch(args);
+        launch(args); // Chama o start()
     }
 }
-
