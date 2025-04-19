@@ -37,7 +37,12 @@ public class QuizAppGui extends Application {
     private QuizAppDAO quizDAO;
 
     // Método principal que inicia a aplicação JavaFX
+    private Stage primaryStage;
+    
     public void start(Stage primaryStage) {
+        this.primaryStage = primaryStage; // salva referência
+
+
         // Inicializa DAO
         quizDAO = new QuizAppDAO();
         usuariosList = FXCollections.observableArrayList(quizDAO.listarTodos());
@@ -68,6 +73,17 @@ public class QuizAppGui extends Application {
         inputPane.setAlignment(Pos.CENTER);
 
         Button btnEntrar = new Button("Entrar");
+      
+        //Definição do botão entrar   
+        btnEntrar.setOnAction(e -> {
+            String nome = txtNome.getText().trim();
+            String senha = txtSenha.getText().trim();
+
+            fazerLogin(nome, senha); // 👈 chamada ao novo método
+        });
+
+
+        
         Button btnCadastrarSe = new Button("Cadastre-se");
 
         HBox buttonPane = new HBox(10, btnEntrar, btnCadastrarSe);
@@ -76,7 +92,16 @@ public class QuizAppGui extends Application {
         VBox loginPane = new VBox(10, inputPane, buttonPane);
         loginPane.setAlignment(Pos.CENTER);
 
+        // ------------------- ENTRAR PANE -------------------
+        VBox EntrarPane = new VBox(10);
+        
+        EntrarPane.setAlignment(Pos.CENTER);
+        EntrarPane.setVisible(false);
+        EntrarPane.setManaged(false); // impede que ocupe espaço quando invisível
+        
+        
         // ------------------- CADASTRO PANE -------------------
+
         VBox cadastroPane = new VBox(10);
         cadastroPane.setAlignment(Pos.CENTER);
         cadastroPane.setVisible(false);
@@ -119,20 +144,15 @@ public class QuizAppGui extends Application {
             String senha = txtNovaSenha.getText().trim();
             boolean admin = chkAdmin.isSelected();
 
-            if (!nome.isEmpty() && !senha.isEmpty()) {
-                QuizModel novoUsuario = new QuizModel(nome, senha, admin);
-                quizDAO.salvar(novoUsuario);
-                showAlert(Alert.AlertType.INFORMATION, "Cadastro", "Usuário cadastrado com sucesso!");
+            cadastrarUsuario(nome, senha, admin);
 
-                // Limpa os campos e volta à tela de login
-                txtNovoLogin.clear();
-                txtNovaSenha.clear();
-                chkAdmin.setSelected(false);
-                btnVoltar.fire();
-            } else {
-                showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
-            }
+            // Limpa os campos e volta para o login
+            txtNovoLogin.clear();
+            txtNovaSenha.clear();
+            chkAdmin.setSelected(false);
+            btnVoltar.fire();
         });
+
 
         // ------------------- Finalização -------------------
         conteudo.getChildren().addAll(loginPane, cadastroPane);
@@ -142,6 +162,138 @@ public class QuizAppGui extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
     }
+    
+    // Método que abre uma nova janela para o painel do administrador
+    private void abrirPainelAdmin() {
+        // Cria uma nova janela (Stage) separada
+        Stage adminStage = new Stage();
+        adminStage.setTitle("Painel do Administrador");
+
+        // Cria o layout vertical (VBox) com espaçamento entre os botões
+        VBox painel = new VBox(15); // 15px entre os elementos
+        painel.setPadding(new Insets(20)); // margem interna
+        painel.setAlignment(Pos.CENTER); // centraliza os elementos no meio da tela
+
+        // Criação dos 5 botões do painel admin
+        Button btnCadastrarQuestao = new Button("Cadastrar Nova Questão");
+        Button btnVisualizarQuestoes = new Button("Visualizar Questões");
+        Button btnVerRanking = new Button("Ver Ranking");
+        Button btnLogout = new Button("Logout");
+        Button btnSair = new Button("Sair");
+
+        // Define uma largura padrão para todos os botões
+        btnCadastrarQuestao.setPrefWidth(200);
+        btnVisualizarQuestoes.setPrefWidth(200);
+        btnVerRanking.setPrefWidth(200);
+        btnLogout.setPrefWidth(200);
+        btnSair.setPrefWidth(200);
+
+        // Ações dos botões (no momento apenas mensagens no terminal)
+        
+        // Ação do botão "Cadastrar Nova Questão"
+        btnCadastrarQuestao.setOnAction(e -> {
+            System.out.println("Cadastrar Questão clicado.");
+            // abrirCadastrarQuestao(); // ← Aqui você pode chamar a tela real futuramente
+        });
+
+        // Ação do botão "Visualizar Questões"
+        btnVisualizarQuestoes.setOnAction(e -> {
+            System.out.println("Visualizar Questões clicado.");
+            // abrirVisualizarQuestoes(); // ← Chamada futura para a tela de visualização
+        });
+
+        // Ação do botão "Ver Ranking"
+        btnVerRanking.setOnAction(e -> {
+            System.out.println("Ver Ranking clicado.");
+            // abrirRanking(); // ← Aqui você pode abrir a tela do ranking depois
+        });
+
+        // Ação do botão "Logout"
+        btnLogout.setOnAction(e -> {
+            adminStage.close(); // Fecha a janela do painel admin
+            adminStage.close();        // Fecha esta janela
+            start(new Stage());       // Reabre a tela de login (reusando o método start)
+        });
+
+        // Ação do botão "Sair"
+        btnSair.setOnAction(e -> {
+            System.exit(0); // Encerra completamente o aplicativo
+        });
+
+        // Adiciona todos os botões ao VBox
+        painel.getChildren().addAll(
+            btnCadastrarQuestao,
+            btnVisualizarQuestoes,
+            btnVerRanking,
+            btnLogout,
+            btnSair
+        );
+
+        // Cria e exibe a cena da janela admin
+        Scene scene = new Scene(painel, 300, 300);
+        adminStage.setScene(scene);
+        adminStage.show(); // Exibe a nova janela
+    }
+
+
+ // Método que abre a tela do usuário com seleção de dificuldade e botão para iniciar o quiz
+    private void abrirPainelUsuario() {
+        // Cria uma nova janela (Stage) separada
+        Stage userStage = new Stage();
+        userStage.setTitle("Escolha de Dificuldade");
+
+        // ComboBox com opções de dificuldade
+        ComboBox<String> comboBox = new ComboBox<>();
+        comboBox.getItems().addAll("Fácil", "Médio", "Difícil");
+        comboBox.setPromptText("Selecione a dificuldade");
+
+        // Botão para iniciar o quiz
+        Button btnIniciarQuiz = new Button("Iniciar Quiz");
+        btnIniciarQuiz.setDisable(true); // desativado até selecionar uma opção
+
+        // Botão "Voltar"
+        Button btnVoltar = new Button("Voltar");
+        
+        // Quando o usuário escolher uma dificuldade, habilita o botão
+        comboBox.setOnAction(e -> {
+            String selecionado = comboBox.getValue();
+            if (selecionado != null && !selecionado.isEmpty()) {
+                btnIniciarQuiz.setDisable(false);
+            }
+        });
+        
+
+        // Ação ao clicar no botão "Iniciar Quiz"
+        btnIniciarQuiz.setOnAction(e -> {
+            String dificuldade = comboBox.getValue();
+            System.out.println("Iniciando quiz na dificuldade: " + dificuldade);
+            // Aqui você chama o método para carregar o quiz
+            // iniciarQuiz(dificuldade);
+            userStage.close(); // Fecha a janela atual se quiser
+        });
+        
+     // Ação ao clicar em "Voltar" → fecha tela e reabre login
+        btnVoltar.setOnAction(e -> {
+            userStage.close();        // Fecha esta janela
+            start(new Stage());       // Reabre a tela de login (reusando o método start)
+        });
+
+        // Layout da tela
+        VBox painel = new VBox(15);
+        painel.setPadding(new Insets(20));
+        painel.setAlignment(Pos.CENTER);
+        painel.getChildren().addAll(comboBox, btnIniciarQuiz, btnVoltar);
+
+        // Exibe a janela
+        Scene scene = new Scene(painel, 300, 200);
+        userStage.setScene(scene);
+        userStage.show();
+
+        System.out.println("Painel Usuário aberto.");
+    }
+
+
+
 
     
     private void cadastrarSe() {
@@ -189,7 +341,6 @@ public class QuizAppGui extends Application {
 
                 quizDAO.salvar(novoUsuario);
                 atualizarLista(); // Atualiza a tela principal
-                showAlert(Alert.AlertType.INFORMATION, "Cadastro", "Usuário cadastrado com sucesso!");
                 cadastroStage.close(); // Fecha a janela
             } else {
                 showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
@@ -202,29 +353,53 @@ public class QuizAppGui extends Application {
     }
 
     // Método para cadastrar um novo usuário
-    private void cadastrarUsuario() {
-        String nome = txtNome.getText().trim();
-        String senha = txtSenha.getText().trim();
-
+ // Método para cadastrar um novo usuário (usuário comum ou admin)
+    private void cadastrarUsuario(String nome, String senha, boolean admin) {
         if (!nome.isEmpty() && !senha.isEmpty()) {
             try {
-                QuizModel usuario = new QuizModel(nome, senha, false);
-                quizDAO.salvar(usuario);
-                atualizarLista(); // Atualiza a ListView
-                limparCampos();   // Limpa os campos
-                showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário cadastrado com sucesso!");
-            } catch (NumberFormatException e) {
-                showAlert(Alert.AlertType.ERROR, "Erro", "Idade inválida!");
+                QuizModel novoUsuario = new QuizModel(nome, senha, admin);
+                quizDAO.salvar(novoUsuario);
+
+                String tipo = admin ? "administrador" : "usuário";
+                showAlert(Alert.AlertType.INFORMATION, "Cadastro", "Cadastro realizado com sucesso como " + tipo + "!");
+
+            } catch (Exception e) {
+                showAlert(Alert.AlertType.ERROR, "Erro", "Erro ao cadastrar o usuário.");
+                e.printStackTrace();
             }
         } else {
             showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
         }
     }
+
+
     
-    
-    private void fazerLogin() {
-    	
+    private void fazerLogin(String nome, String senha) {
+        if (!nome.isEmpty() && !senha.isEmpty()) {
+            QuizModel usuario = quizDAO.buscarPorNomeESenha(nome, senha);
+
+            if (usuario != null) {
+                if (usuario.getAdmin()) {
+                    showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como administrador.");
+                    primaryStage.close(); // fecha a tela de login
+                    abrirPainelAdmin();
+                    System.out.println("Admin? " + usuario.getAdmin());
+
+                } else {
+                    showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como usuário.");
+                    primaryStage.close(); // fecha a tela de login
+                    abrirPainelUsuario();
+                    System.out.println("Admin? " + usuario.getAdmin());
+
+                }
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Erro", "Usuário ou senha inválidos.");
+            }
+        } else {
+            showAlert(Alert.AlertType.WARNING, "Aviso", "Preencha todos os campos.");
+        }
     }
+
 
     // Método para alterar um usuário já existente
     private void alterarUsuario() {

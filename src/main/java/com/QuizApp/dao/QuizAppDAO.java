@@ -72,4 +72,17 @@ public class QuizAppDAO {
     public void close() {
         factory.close();
     }
+    
+    public QuizModel buscarPorNomeESenha(String nome, String senha) {
+        try (Session session = factory.openSession()) {
+        	List<QuizModel> resultados = session.createQuery("FROM QuizModel WHERE nome = :nome AND senha = :senha", QuizModel.class)
+        	        .setParameter("nome", nome)
+        	        .setParameter("senha", senha)
+        	        .list();
+
+        	return resultados.isEmpty() ? null : resultados.get(0);
+
+        }
+    }
+
 }

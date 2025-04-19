@@ -20,7 +20,7 @@ public class QuizModel {
     public QuizModel(String nome, String senha, boolean admin) {
         this.nome = nome;
         this.senha = senha;
-        this.admin = false;//por padrão
+        this.admin = admin;//por padrão
     }
     
     public boolean getAdmin(){return admin;}
