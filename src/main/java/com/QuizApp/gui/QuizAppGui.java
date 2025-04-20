@@ -2,30 +2,65 @@
 package com.QuizApp.gui;
 
 // Importações do DAO e do modelo de dados
+//Importações do DAO e do modelo de dados
 import com.QuizApp.dao.QuizAppDAO;
-import com.QuizApp.model.QuizModel;
+import com.QuizApp.dao.QuestaoDAO;
+import com.QuizApp.dao.PontuacaoDAO;
 
-// Importações do JavaFX
+import com.QuizApp.model.QuizModel;
+import com.QuizApp.model.Questao;
+import com.QuizApp.model.Pontuacao;
+
+//Extras para salvar data
+import java.time.LocalDateTime;
+
+
+// Java
+import java.util.List;
+
+// JavaFX - Componentes
 import javafx.application.Application;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.geometry.Insets;
+import javafx.stage.Stage;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.Node;
+
+
+// JavaFX - Layouts
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
-import javafx.geometry.Pos;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.Priority;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+
+// JavaFX - Animações e bindings
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+
+// JavaFX - Dados dinâmicos
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import java.util.ArrayList;
 
 
 
 // Classe principal da aplicação gráfica, estendendo Application (JavaFX)
 public class QuizAppGui extends Application {
 
-    // Campos de entrada para nome e senha (ou email)
-    private TextField txtNome, txtSenha;
+    // Campos de entrada para nome 
+    private TextField txtNome;
+    
+    private PasswordField txtSenha;
+
 
     // ListView para exibir os usuários cadastrados
     private ListView<QuizModel> listViewUsuarios;
@@ -38,6 +73,9 @@ public class QuizAppGui extends Application {
 
     // Método principal que inicia a aplicação JavaFX
     private Stage primaryStage;
+    
+    private String usuarioLogado; // armazena o nome do usuário logado
+
     
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage; // salva referência
@@ -65,7 +103,7 @@ public class QuizAppGui extends Application {
         VBox senhaBox = new VBox(5);
         senhaBox.setAlignment(Pos.CENTER);
         Label lblSenha = new Label("Senha:");
-        txtSenha = new TextField();
+        txtSenha = new PasswordField();
         txtSenha.setMaxWidth(200);
         senhaBox.getChildren().addAll(lblSenha, txtSenha);
 
@@ -79,8 +117,30 @@ public class QuizAppGui extends Application {
             String nome = txtNome.getText().trim();
             String senha = txtSenha.getText().trim();
 
-            fazerLogin(nome, senha); // 👈 chamada ao novo método
+            if (!nome.isEmpty() && !senha.isEmpty()) {
+                QuizModel usuario = quizDAO.buscarPorNomeESenha(nome, senha);
+
+                if (usuario != null) {
+                    usuarioLogado = usuario.getNome(); 
+                    
+                    Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+                    stageAtual.close();
+
+                    if (usuario.getAdmin()) {
+                        showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como administrador.");
+                        abrirPainelAdmin();
+                    } else {
+                        showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como usuário.");
+                        abrirPainelUsuario(); 
+                    }
+                } else {
+                    showAlert(Alert.AlertType.ERROR, "Erro", "Usuário ou senha inválidos.");
+                }
+            } else {
+                showAlert(Alert.AlertType.WARNING, "Aviso", "Preencha todos os campos.");
+            }
         });
+
 
 
         
@@ -156,6 +216,9 @@ public class QuizAppGui extends Application {
 
         // ------------------- Finalização -------------------
         conteudo.getChildren().addAll(loginPane, cadastroPane);
+        
+        //inserirQuestoesExemplo(); // <<< Roda uma única vez
+
 
         Scene scene = new Scene(root, 300, 350);
         primaryStage.setTitle("Login do Quiz");
@@ -163,6 +226,209 @@ public class QuizAppGui extends Application {
         primaryStage.show();
     }
     
+    
+    private void iniciarQuiz(String dificuldade, String usuario) {
+        Stage quizStage = new Stage();
+        quizStage.setTitle("Quiz");
+
+        // Buscar questões do banco pela dificuldade
+        QuestaoDAO dao = new QuestaoDAO();
+        List<Questao> questoes = dao.listarPorDificuldade(dificuldade); // método que vamos criar
+
+        if (questoes.isEmpty()) {
+            showAlert(Alert.AlertType.INFORMATION, "Aviso", "Nenhuma questão encontrada para esta dificuldade.");
+            return;
+        }
+        
+        //controle de pontos
+        final int[] acertos = {0};
+        final int[] pontos = {0};
+
+
+        // Controle de índice
+        final int[] indiceAtual = {0};
+        final Label tempoLabel = new Label("Tempo restante: 60s");
+        final Timeline[] timer = {null};
+
+        // Elementos dinâmicos
+        Label lblEnunciado = new Label();
+        ToggleGroup grupo = new ToggleGroup();
+        RadioButton rbA = new RadioButton();
+        RadioButton rbB = new RadioButton();
+        RadioButton rbC = new RadioButton();
+        RadioButton rbD = new RadioButton();
+        rbA.setToggleGroup(grupo);
+        rbB.setToggleGroup(grupo);
+        rbC.setToggleGroup(grupo);
+        rbD.setToggleGroup(grupo);
+
+        Button btnProximo = new Button("Próximo");
+
+        // Função para exibir a questão
+        Runnable exibirQuestao = () -> {
+            if (indiceAtual[0] >= questoes.size()) {
+            	showAlert(
+            		    Alert.AlertType.INFORMATION,
+            		    "Quiz finalizado!",
+            		    "Você acertou " + acertos[0] + " de " + questoes.size() + " questões.\n" +
+            		    "Pontuação total: " + pontos[0] + " pontos."
+            		);
+            	
+            	// Salva no ranking
+            	PontuacaoDAO pdao = new PontuacaoDAO();
+            	pdao.salvar(new Pontuacao(usuario, pontos[0], LocalDateTime.now()));
+            	
+            	
+                quizStage.close();
+                abrirPainelUsuario(); 
+
+                return;
+            }
+
+            Questao q = questoes.get(indiceAtual[0]);
+            lblEnunciado.setText(q.getEnunciado());
+            rbA.setText(q.getOpcaoA());
+            rbB.setText(q.getOpcaoB());
+            rbC.setText(q.getOpcaoC());
+            rbD.setText(q.getOpcaoD());
+
+            grupo.selectToggle(null); // desmarca seleção
+        };
+
+        btnProximo.setOnAction(e -> {
+            // Pega a resposta marcada
+            RadioButton selecionada = (RadioButton) grupo.getSelectedToggle();
+
+            if (selecionada != null) {
+                Questao q = questoes.get(indiceAtual[0]);
+
+                // Recupera o texto da resposta correta com base na letra marcada
+                String correta = switch (q.getCorreta()) {
+                    case "A" -> q.getOpcaoA();
+                    case "B" -> q.getOpcaoB();
+                    case "C" -> q.getOpcaoC();
+                    case "D" -> q.getOpcaoD();
+                    default -> "";
+                };
+
+                // Compara com a opção escolhida pelo usuário
+                String respostaUsuario = selecionada.getText();
+                if (respostaUsuario.equals(correta)) {
+                    acertos[0]++;
+
+                    // Adiciona pontuação baseada na dificuldade
+                    int valor = switch (q.getDificuldade().toLowerCase()) {
+                        case "fácil" -> 2;
+                        case "médio" -> 3;
+                        case "difícil" -> 4;
+                        default -> 1;
+                    };
+                    pontos[0] += valor;
+                }
+            }
+
+            // Próxima pergunta
+            indiceAtual[0]++;
+            exibirQuestao.run();
+        });
+
+
+        VBox layout = new VBox(10,
+                tempoLabel,
+                lblEnunciado,
+                rbA, rbB, rbC, rbD,
+                btnProximo
+        );
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER);
+
+        Scene scene = new Scene(layout, 400, 350);
+        quizStage.setScene(scene);
+        quizStage.show();
+
+        iniciarTimer(tempoLabel, quizStage, acertos, pontos, questoes, usuario);
+        exibirQuestao.run(); // exibe a primeira questão
+    }
+    
+    private void iniciarTimer(Label tempoLabel, Stage quizStage, int[] acertos, int[] pontos, List<Questao> questoes, String usuario) {
+        IntegerProperty segundos = new SimpleIntegerProperty(60);
+        tempoLabel.textProperty().bind(Bindings.concat("Tempo restante: ", segundos, "s"));
+
+        Timeline timeline = new Timeline(
+            new KeyFrame(Duration.seconds(1), e -> {
+                segundos.set(segundos.get() - 1);
+
+                if (segundos.get() <= 0) {
+                    ((Timeline) e.getSource()).stop();
+                    tempoLabel.textProperty().unbind();
+                    tempoLabel.setText("Tempo esgotado!");
+
+                    // Mostra o resumo final
+                    showAlert(
+                        Alert.AlertType.INFORMATION,
+                        "Tempo encerrado",
+                        "Você acertou " + acertos[0] + " de " + questoes.size() + " questões.\n" +
+                        "Pontuação total: " + pontos[0] + " pontos."
+                    );
+
+                    // Salva no ranking
+                    PontuacaoDAO pdao = new PontuacaoDAO();
+                    pdao.salvar(new Pontuacao(usuario, pontos[0], LocalDateTime.now()));
+
+                    // Fecha a janela
+                    quizStage.close();
+                    
+                    abrirPainelUsuario(); 
+
+                    
+                }
+            })
+        );
+
+        timeline.setCycleCount(60);
+        timeline.play();
+    }
+
+    
+    private void abrirRanking() {
+        Stage stage = new Stage();
+        stage.setTitle("Ranking de Pontuação");
+
+        TableView<Pontuacao> tabela = new TableView<>();
+        tabela.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<Pontuacao, String> colUsuario = new TableColumn<>("Usuário");
+        colUsuario.setCellValueFactory(new PropertyValueFactory<>("usuario"));
+
+        TableColumn<Pontuacao, Integer> colPontos = new TableColumn<>("Pontuação");
+        colPontos.setCellValueFactory(new PropertyValueFactory<>("pontos"));
+
+        TableColumn<Pontuacao, LocalDateTime> colData = new TableColumn<>("Data");
+        colData.setCellValueFactory(new PropertyValueFactory<>("data"));
+
+        tabela.getColumns().addAll(colUsuario, colPontos, colData);
+
+        PontuacaoDAO dao = new PontuacaoDAO();
+        List<Pontuacao> lista = dao.listarTodas();
+        tabela.setItems(FXCollections.observableArrayList(lista));
+
+        Button btnVoltar = new Button("Voltar");
+        btnVoltar.setOnAction(e -> {
+            Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            stageAtual.close(); // Fecha a tela de ranking
+            abrirPainelAdmin(); // Volta para o painel admin
+        });
+
+
+        VBox layout = new VBox(10, tabela, btnVoltar);
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER);
+
+        Scene scene = new Scene(layout, 500, 400);
+        stage.setScene(scene);
+        stage.show();
+    }
+  
     // Método que abre uma nova janela para o painel do administrador
     private void abrirPainelAdmin() {
         // Cria uma nova janela (Stage) separada
@@ -192,20 +458,31 @@ public class QuizAppGui extends Application {
         
         // Ação do botão "Cadastrar Nova Questão"
         btnCadastrarQuestao.setOnAction(e -> {
-            System.out.println("Cadastrar Questão clicado.");
-            // abrirCadastrarQuestao(); // ← Aqui você pode chamar a tela real futuramente
+            // Fecha o panel atual (admin)
+            Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            stageAtual.close();
+
+            // Abre o panel de cadastro
+            abrirCadastroQuestoes();
         });
 
         // Ação do botão "Visualizar Questões"
         btnVisualizarQuestoes.setOnAction(e -> {
             System.out.println("Visualizar Questões clicado.");
-            // abrirVisualizarQuestoes(); // ← Chamada futura para a tela de visualização
+            
+            Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            stageAtual.close();
+            abrirVisualizarQuestoes(); // ← Chamada futura para a tela de visualização
         });
 
         // Ação do botão "Ver Ranking"
         btnVerRanking.setOnAction(e -> {
-            System.out.println("Ver Ranking clicado.");
-            // abrirRanking(); // ← Aqui você pode abrir a tela do ranking depois
+            // Fecha o painel atual (admin)
+            Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            stageAtual.close();
+
+            // Abre a tela de ranking
+            abrirRanking();
         });
 
         // Ação do botão "Logout"
@@ -267,8 +544,7 @@ public class QuizAppGui extends Application {
         btnIniciarQuiz.setOnAction(e -> {
             String dificuldade = comboBox.getValue();
             System.out.println("Iniciando quiz na dificuldade: " + dificuldade);
-            // Aqui você chama o método para carregar o quiz
-            // iniciarQuiz(dificuldade);
+            iniciarQuiz(dificuldade, usuarioLogado); 
             userStage.close(); // Fecha a janela atual se quiser
         });
         
@@ -292,62 +568,99 @@ public class QuizAppGui extends Application {
         System.out.println("Painel Usuário aberto.");
     }
 
+    private void abrirCadastroQuestoes() {
+        Stage cadastroStage = new Stage();
+        cadastroStage.setTitle("Cadastrar Nova Questão");
 
+        // Campo de enunciado (TextArea para texto longo)
+        Label lblEnunciado = new Label("Enunciado da questão:");
+        TextArea txtEnunciado = new TextArea();
+        txtEnunciado.setPrefRowCount(4);
+        txtEnunciado.setWrapText(true);
 
+        // Campos de alternativas
+        TextField txtA = new TextField();
+        txtA.setPromptText("Alternativa A");
 
-    
-    private void cadastrarSe() {
-    	//janela secundária
-    	Stage cadastroStage =  new Stage();
-    	cadastroStage.setTitle("Cadastro de novo usuário");
-    	
-    	// Layout em grade
-        GridPane grid = new GridPane();
-        grid.setPadding(new Insets(20));
-        grid.setHgap(10);
-        grid.setVgap(10);
-        
-        // Campos
-        Label lblLogin = new Label("Login:");
-        TextField txtLogin = new TextField();
+        TextField txtB = new TextField();
+        txtB.setPromptText("Alternativa B");
 
-        Label lblSenha = new Label("Senha:");
-        PasswordField txtSenha = new PasswordField();
+        TextField txtC = new TextField();
+        txtC.setPromptText("Alternativa C");
 
-        CheckBox chkAdmin = new CheckBox("Administrador");
+        TextField txtD = new TextField();
+        txtD.setPromptText("Alternativa D");
 
-        Button btnCadastrar = new Button("Cadastrar");
-        
-        // Adiciona os elementos ao GridPane
-        grid.add(lblLogin, 0, 0);
-        grid.add(txtLogin, 1, 0);
+        // ComboBox para selecionar a alternativa correta
+        ComboBox<String> comboCorreta = new ComboBox<>();
+        comboCorreta.getItems().addAll("A", "B", "C", "D");
+        comboCorreta.setPromptText("Alternativa correta");
 
-        grid.add(lblSenha, 0, 1);
-        grid.add(txtSenha, 1, 1);
+        // ComboBox para selecionar a dificuldade
+        ComboBox<String> comboDificuldade = new ComboBox<>();
+        comboDificuldade.getItems().addAll("Fácil", "Médio", "Difícil");
+        comboDificuldade.setPromptText("Dificuldade");
 
-        grid.add(chkAdmin, 1, 2);
+        // Botões
+        Button btnSalvar = new Button("Salvar");
+        Button btnVoltar = new Button("Voltar");
 
-        grid.add(btnCadastrar, 1, 3);
-        
-     // Define ação do botão cadastrar
-        btnCadastrar.setOnAction(e -> {
-            String nome = txtLogin.getText().trim();
-            String senha = txtSenha.getText().trim();
-            boolean admin = chkAdmin.isSelected();
+        // Ação do botão voltar
+        btnVoltar.setOnAction(e -> cadastroStage.close());
 
-            if (!nome.isEmpty() && !senha.isEmpty()) {
-                QuizModel novoUsuario = new QuizModel(nome, senha,chkAdmin.isSelected());
-                novoUsuario.setAdmin(admin); // você precisa ter esse campo no modelo!
+        // Ação do botão salvar
+        btnSalvar.setOnAction(e -> {
+            String enunciado = txtEnunciado.getText().trim();
+            String a = txtA.getText().trim();
+            String b = txtB.getText().trim();
+            String c = txtC.getText().trim();
+            String d = txtD.getText().trim();
+            String correta = comboCorreta.getValue();
+            String dificuldade = comboDificuldade.getValue();
 
-                quizDAO.salvar(novoUsuario);
-                atualizarLista(); // Atualiza a tela principal
-                cadastroStage.close(); // Fecha a janela
-            } else {
-                showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
+            if (enunciado.isEmpty() || a.isEmpty() || b.isEmpty() || c.isEmpty() || d.isEmpty()
+                    || correta == null || dificuldade == null) {
+                showAlert(Alert.AlertType.WARNING, "Campos obrigatórios", "Preencha todos os campos.");
+                return;
             }
+
+            // Aqui você pode criar o objeto Questao e salvar no banco
+            System.out.println("Questão cadastrada:");
+            System.out.println("Enunciado: " + enunciado);
+            System.out.println("A: " + a + " | B: " + b + " | C: " + c + " | D: " + d);
+            System.out.println("Correta: " + correta + " | Dificuldade: " + dificuldade);
+
+            // Cria o objeto Questao com os dados preenchidos
+            Questao novaQuestao = new Questao(enunciado, a, b, c, d, correta, dificuldade);
+
+            // Salva no banco usando o DAO
+            QuestaoDAO dao = new QuestaoDAO();
+            dao.salvar(novaQuestao);
+
+            // Mensagem de sucesso
+            showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Questão salva com sucesso!");
+
+	         // Fecha a tela de cadastro
+	         cadastroStage.close();
+	
+	         // Retorna para o painel admin
+	         abrirPainelAdmin();
+
+
         });
-        
-        Scene scene = new Scene(grid, 300, 200);
+
+        // Layout
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER_LEFT);
+        layout.getChildren().addAll(
+                lblEnunciado, txtEnunciado,
+                txtA, txtB, txtC, txtD,
+                comboCorreta, comboDificuldade,
+                btnSalvar, btnVoltar
+        );
+
+        Scene scene = new Scene(layout, 400, 500);
         cadastroStage.setScene(scene);
         cadastroStage.show();
     }
@@ -372,8 +685,160 @@ public class QuizAppGui extends Application {
         }
     }
 
+    private void abrirVisualizarQuestoes() {
+    	Stage stage = new Stage();
+        stage.setTitle("Questões Cadastradas");
 
+        // Tabela
+        TableView<Questao> tabela = new TableView<>();
+        tabela.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        // Coluna: Enunciado
+        TableColumn<Questao, String> colEnunciado = new TableColumn<>("Enunciado");
+        colEnunciado.setCellValueFactory(new PropertyValueFactory<>("enunciado"));
+
+        // Coluna: Dificuldade
+        TableColumn<Questao, String> colDificuldade = new TableColumn<>("Dificuldade");
+        colDificuldade.setCellValueFactory(new PropertyValueFactory<>("dificuldade"));
+
+        tabela.getColumns().addAll(colEnunciado, colDificuldade);
+
+        // Dados do banco
+        QuestaoDAO dao = new QuestaoDAO();
+        List<Questao> lista = dao.listarTodas();
+        ObservableList<Questao> dados = FXCollections.observableArrayList(lista);
+        tabela.setItems(dados);
+
+        // Botões
+        Button btnEditar = new Button("Editar");
+        Button btnExcluir = new Button("Excluir");
+        Button btnVoltar = new Button("Voltar");
+
+        btnEditar.setOnAction(e -> {
+            Questao selecionada = tabela.getSelectionModel().getSelectedItem();
+            if (selecionada != null) {
+                stage.close();
+                abrirCadastroQuestoesEdicao(selecionada);
+            } else {
+                showAlert(Alert.AlertType.WARNING, "Aviso", "Selecione uma questão para editar.");
+            }
+        });
+
+        btnExcluir.setOnAction(e -> {
+            Questao selecionada = tabela.getSelectionModel().getSelectedItem();
+            if (selecionada != null) {
+                dao.excluir(selecionada);
+                tabela.getItems().remove(selecionada); // remove da tabela direto
+            } else {
+                showAlert(Alert.AlertType.WARNING, "Aviso", "Selecione uma questão para excluir.");
+            }
+        });
+
+        btnVoltar.setOnAction(e -> {
+            Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            stageAtual.close(); 
+            abrirPainelAdmin(); // Volta para o painel admin
+        });
+
+
+        HBox botoes = new HBox(10, btnEditar, btnExcluir, btnVoltar);
+        botoes.setAlignment(Pos.CENTER);
+        botoes.setPadding(new Insets(10));
+
+        VBox layout = new VBox(10, tabela, botoes);
+        layout.setPadding(new Insets(15));
+
+        Scene scene = new Scene(layout, 600, 400);
+        stage.setScene(scene);
+        stage.show();
+    }
     
+    private void abrirCadastroQuestoesEdicao(Questao questao) {
+        Stage stage = new Stage();
+        stage.setTitle("Editar Questão");
+
+        // Campos preenchidos com os dados da questão
+        Label lblEnunciado = new Label("Enunciado da questão:");
+        TextArea txtEnunciado = new TextArea(questao.getEnunciado());
+        txtEnunciado.setPrefRowCount(4);
+        txtEnunciado.setWrapText(true);
+
+        TextField txtA = new TextField(questao.getOpcaoA());
+        txtA.setPromptText("Alternativa A");
+
+        TextField txtB = new TextField(questao.getOpcaoB());
+        txtB.setPromptText("Alternativa B");
+
+        TextField txtC = new TextField(questao.getOpcaoC());
+        txtC.setPromptText("Alternativa C");
+
+        TextField txtD = new TextField(questao.getOpcaoD());
+        txtD.setPromptText("Alternativa D");
+
+        ComboBox<String> comboCorreta = new ComboBox<>();
+        comboCorreta.getItems().addAll("A", "B", "C", "D");
+        comboCorreta.setValue(questao.getCorreta());
+
+        ComboBox<String> comboDificuldade = new ComboBox<>();
+        comboDificuldade.getItems().addAll("Fácil", "Médio", "Difícil");
+        comboDificuldade.setValue(questao.getDificuldade());
+
+        // Botões
+        Button btnSalvar = new Button("Salvar");
+        Button btnCancelar = new Button("Cancelar");
+
+        btnCancelar.setOnAction(e -> stage.close());
+
+        btnSalvar.setOnAction(e -> {
+            // Atualiza os dados do objeto
+            String enunciado = txtEnunciado.getText().trim();
+            String a = txtA.getText().trim();
+            String b = txtB.getText().trim();
+            String c = txtC.getText().trim();
+            String d = txtD.getText().trim();
+            String correta = comboCorreta.getValue();
+            String dificuldade = comboDificuldade.getValue();
+
+            if (enunciado.isEmpty() || a.isEmpty() || b.isEmpty() || c.isEmpty() || d.isEmpty()
+                    || correta == null || dificuldade == null) {
+                showAlert(Alert.AlertType.WARNING, "Campos obrigatórios", "Preencha todos os campos.");
+                return;
+            }
+
+            // Atualiza os campos da questão original
+            questao.setEnunciado(enunciado);
+            questao.setOpcaoA(a);
+            questao.setOpcaoB(b);
+            questao.setOpcaoC(c);
+            questao.setOpcaoD(d);
+            questao.setCorreta(correta);
+            questao.setDificuldade(dificuldade);
+
+            // Salva no banco (merge)
+            QuestaoDAO dao = new QuestaoDAO();
+            dao.atualizar(questao); // método que faremos no DAO
+
+            showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Questão atualizada com sucesso!");
+            stage.close();
+            abrirVisualizarQuestoes(); // recarrega a visualização
+        });
+
+        VBox layout = new VBox(10,
+                lblEnunciado, txtEnunciado,
+                txtA, txtB, txtC, txtD,
+                comboCorreta, comboDificuldade,
+                new HBox(10, btnSalvar, btnCancelar)
+        );
+
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER_LEFT);
+
+        Scene scene = new Scene(layout, 500, 500);
+        stage.setScene(scene);
+        stage.show();
+    }
+
+
     private void fazerLogin(String nome, String senha) {
         if (!nome.isEmpty() && !senha.isEmpty()) {
             QuizModel usuario = quizDAO.buscarPorNomeESenha(nome, senha);
@@ -399,48 +864,8 @@ public class QuizAppGui extends Application {
             showAlert(Alert.AlertType.WARNING, "Aviso", "Preencha todos os campos.");
         }
     }
-
-
     // Método para alterar um usuário já existente
-    private void alterarUsuario() {
-        QuizModel selecionado = listViewUsuarios.getSelectionModel().getSelectedItem();
-        if (selecionado != null) {
-            selecionado.setNome(txtNome.getText().trim());
-            selecionado.setEmail(txtSenha.getText().trim());
-
-            quizDAO.atualizar(selecionado);
-            atualizarLista();
-            limparCampos();
-            showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário alterado com sucesso!");
-        } else {
-            showAlert(Alert.AlertType.WARNING, "Erro", "Selecione um usuário para alterar!");
-        }
-    }
-
-    // Método para excluir um usuário
-    private void excluirUsuario() {
-        QuizModel selecionado = listViewUsuarios.getSelectionModel().getSelectedItem();
-        if (selecionado != null) {
-            quizDAO.excluir(selecionado);
-            atualizarLista();
-            limparCampos();
-            showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário excluído com sucesso!");
-        } else {
-            showAlert(Alert.AlertType.WARNING, "Erro", "Selecione um usuário para excluir!");
-        }
-    }
-
-    // Recarrega os dados do banco na lista da interface
-    private void atualizarLista() {
-        usuariosList.setAll(quizDAO.listarTodos());
-    }
-
     // Limpa os campos de texto e desmarca seleção da lista
-    private void limparCampos() {
-        txtNome.clear();
-        txtSenha.clear();
-        listViewUsuarios.getSelectionModel().clearSelection();
-    }
 
     // Mostra um alerta na tela
     private void showAlert(Alert.AlertType type, String title, String message) {
@@ -450,6 +875,29 @@ public class QuizAppGui extends Application {
         alert.setContentText(message);
         alert.showAndWait();
     }
+    
+    
+    //tempórário
+    /*private void inserirQuestoesExemplo() {
+        List<Questao> lista = new ArrayList<>();
+
+        lista.add(new Questao("Qual a capital do Brasil?", "São Paulo", "Rio de Janeiro", "Brasília", "Belo Horizonte", "C", "Fácil"));
+        lista.add(new Questao("Quanto é 5 x 3?", "15", "10", "20", "8", "A", "Fácil"));
+        lista.add(new Questao("Qual é o maior planeta do sistema solar?", "Terra", "Saturno", "Júpiter", "Vênus", "C", "Médio"));
+        lista.add(new Questao("Qual a fórmula da água?", "H2O", "CO2", "NaCl", "HCl", "A", "Fácil"));
+        lista.add(new Questao("Em que continente fica o Egito?", "Ásia", "Europa", "África", "Oceania", "C", "Fácil"));
+        lista.add(new Questao("Quem escreveu 'Dom Casmurro'?", "Machado de Assis", "José de Alencar", "Carlos Drummond", "Clarice Lispector", "A", "Médio"));
+        lista.add(new Questao("Quantos segundos tem uma hora?", "3600", "60", "600", "1200", "A", "Fácil"));
+        lista.add(new Questao("Qual desses é um número primo?", "12", "18", "17", "20", "C", "Médio"));
+        lista.add(new Questao("Qual é a raiz quadrada de 144?", "10", "11", "13", "12", "D", "Médio"));
+        lista.add(new Questao("Qual o símbolo químico do Ferro?", "Fe", "Ir", "F", "Fr", "A", "Difícil"));
+
+        QuestaoDAO dao = new QuestaoDAO();
+        dao.salvarEmLote(lista);
+
+        showAlert(Alert.AlertType.INFORMATION, "Sucesso", "10 questões adicionadas ao banco!");
+    }*/
+
 
     // Método principal que inicia a aplicação
     public static void main(String[] args) {
