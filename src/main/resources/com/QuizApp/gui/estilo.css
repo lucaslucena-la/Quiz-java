@@ -1,0 +1,41 @@
+.root {
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-background-color: #f0f4f8;
+}
+
+.label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #333333;
+}
+
+.button {
+    -fx-background-color: #0078d4;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+	-fx-cursor: hand;
+
+}
+
+.button:hover {
+    -fx-background-color: #005fa3;
+}
+
+.text-field, .password-field, .text-area, .combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #ccc;
+    -fx-border-radius: 5px;
+    -fx-padding: 6px;
+}
+
+.combo-box .arrow-button {
+    -fx-background-color: white;
+    -fx-border-color: #cccccc;
+}
+
+.text-field, .combo-box {
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 4, 0, 0, 2);
+}
+
+
+

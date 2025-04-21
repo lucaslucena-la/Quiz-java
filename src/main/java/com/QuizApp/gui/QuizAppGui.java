@@ -30,10 +30,7 @@ import javafx.scene.Node;
 // JavaFX - Layouts
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.Priority;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 
@@ -48,9 +45,6 @@ import javafx.beans.property.SimpleIntegerProperty;
 // JavaFX - Dados dinâmicos
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-
-import java.util.ArrayList;
-
 
 
 // Classe principal da aplicação gráfica, estendendo Application (JavaFX)
@@ -78,6 +72,7 @@ public class QuizAppGui extends Application {
 
     
     public void start(Stage primaryStage) {
+    	
         this.primaryStage = primaryStage; // salva referência
 
 
@@ -203,6 +198,18 @@ public class QuizAppGui extends Application {
             String nome = txtNovoLogin.getText().trim();
             String senha = txtNovaSenha.getText().trim();
             boolean admin = chkAdmin.isSelected();
+            
+         // Verifica se os campos obrigatórios estão preenchidos
+            if (nome.isEmpty() || senha.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
+                return; // sai da função se tiver algo vazio
+            }
+
+            // 🚨 Verifica se o nome de login já existe no banco
+            if (quizDAO.nomeExiste(nome)) {
+                showAlert(Alert.AlertType.WARNING, "Erro", "Este nome de login já está sendo usado. Escolha outro.");
+                return; // impede o cadastro se o nome já existir
+            }
 
             cadastrarUsuario(nome, senha, admin);
 
@@ -221,6 +228,7 @@ public class QuizAppGui extends Application {
 
 
         Scene scene = new Scene(root, 300, 350);
+        aplicarEstilo(scene);
         primaryStage.setTitle("Login do Quiz");
         primaryStage.setScene(scene);
         primaryStage.show();
@@ -344,6 +352,8 @@ public class QuizAppGui extends Application {
 
         Scene scene = new Scene(layout, 400, 350);
         quizStage.setScene(scene);
+        aplicarEstilo(scene);
+
         quizStage.show();
 
         iniciarTimer(tempoLabel, quizStage, acertos, pontos, questoes, usuario);
@@ -425,6 +435,8 @@ public class QuizAppGui extends Application {
         layout.setAlignment(Pos.CENTER);
 
         Scene scene = new Scene(layout, 500, 400);
+        aplicarEstilo(scene);
+
         stage.setScene(scene);
         stage.show();
     }
@@ -464,6 +476,8 @@ public class QuizAppGui extends Application {
 
             // Abre o panel de cadastro
             abrirCadastroQuestoes();
+            
+            
         });
 
         // Ação do botão "Visualizar Questões"
@@ -508,6 +522,8 @@ public class QuizAppGui extends Application {
 
         // Cria e exibe a cena da janela admin
         Scene scene = new Scene(painel, 300, 300);
+        aplicarEstilo(scene);
+
         adminStage.setScene(scene);
         adminStage.show(); // Exibe a nova janela
     }
@@ -562,6 +578,8 @@ public class QuizAppGui extends Application {
 
         // Exibe a janela
         Scene scene = new Scene(painel, 300, 200);
+        aplicarEstilo(scene);
+
         userStage.setScene(scene);
         userStage.show();
 
@@ -606,7 +624,11 @@ public class QuizAppGui extends Application {
         Button btnVoltar = new Button("Voltar");
 
         // Ação do botão voltar
-        btnVoltar.setOnAction(e -> cadastroStage.close());
+        btnVoltar.setOnAction(e -> {
+        	cadastroStage.close();
+        	
+        	abrirPainelAdmin();
+        });
 
         // Ação do botão salvar
         btnSalvar.setOnAction(e -> {
@@ -624,12 +646,7 @@ public class QuizAppGui extends Application {
                 return;
             }
 
-            // Aqui você pode criar o objeto Questao e salvar no banco
-            System.out.println("Questão cadastrada:");
-            System.out.println("Enunciado: " + enunciado);
-            System.out.println("A: " + a + " | B: " + b + " | C: " + c + " | D: " + d);
-            System.out.println("Correta: " + correta + " | Dificuldade: " + dificuldade);
-
+            
             // Cria o objeto Questao com os dados preenchidos
             Questao novaQuestao = new Questao(enunciado, a, b, c, d, correta, dificuldade);
 
@@ -661,6 +678,8 @@ public class QuizAppGui extends Application {
         );
 
         Scene scene = new Scene(layout, 400, 500);
+        aplicarEstilo(scene);
+
         cadastroStage.setScene(scene);
         cadastroStage.show();
     }
@@ -749,6 +768,8 @@ public class QuizAppGui extends Application {
         layout.setPadding(new Insets(15));
 
         Scene scene = new Scene(layout, 600, 400);
+        aplicarEstilo(scene);
+
         stage.setScene(scene);
         stage.show();
     }
@@ -834,6 +855,8 @@ public class QuizAppGui extends Application {
         layout.setAlignment(Pos.CENTER_LEFT);
 
         Scene scene = new Scene(layout, 500, 500);
+        aplicarEstilo(scene);
+
         stage.setScene(scene);
         stage.show();
     }
@@ -903,4 +926,9 @@ public class QuizAppGui extends Application {
     public static void main(String[] args) {
         launch(args); // Chama o start()
     }
+    
+    private void aplicarEstilo(Scene scene) {
+        scene.getStylesheets().add(getClass().getResource("/com/QuizApp/gui/estilo.css").toExternalForm());
+    }
+
 }

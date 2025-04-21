@@ -67,6 +67,18 @@ public class QuizAppDAO {
             return session.get(QuizModel.class, id); // Retorna o objeto com o ID informado
         }
     }
+    
+    public boolean nomeExiste(String nome) {
+        try (Session session = factory.openSession()) {
+            Long count = session.createQuery(
+                "SELECT COUNT(*) FROM QuizModel WHERE nome = :nome", Long.class)
+                .setParameter("nome", nome)
+                .uniqueResult();
+
+            return count != null && count > 0;
+        }
+    }
+
 
     // Fecha a SessionFactory quando não for mais necessária (libera recursos)
     public void close() {
