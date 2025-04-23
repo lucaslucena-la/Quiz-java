@@ -14,7 +14,6 @@ import com.QuizApp.model.Pontuacao;
 //Extras para salvar data
 import java.time.LocalDateTime;
 
-
 // Java
 import java.util.List;
 
@@ -73,7 +72,6 @@ public class QuizAppGui extends Application {
     
     private String usuarioLogado; // armazena o nome do usuário logado
 
-    
     public void start(Stage primaryStage) {
     	
         this.primaryStage = primaryStage; // salva referência
@@ -281,8 +279,7 @@ public class QuizAppGui extends Application {
             	PontuacaoDAO pdao = new PontuacaoDAO();
             	pdao.salvarOuAtualizarPontuacao(usuario, pontos[0]);
 
-            	
-            	
+            	   	
                 quizStage.close();
                 abrirPainelUsuario(); 
 
@@ -322,9 +319,9 @@ public class QuizAppGui extends Application {
 
                     // Adiciona pontuação baseada na dificuldade
                     int valor = switch (q.getDificuldade().toLowerCase()) {
-                        case "fácil" -> 2;
-                        case "médio" -> 3;
-                        case "difícil" -> 4;
+                        case "fácil" -> 1;
+                        case "médio" -> 2;
+                        case "difícil" -> 3;
                         default -> 1;
                     };
                     pontos[0] += valor;
@@ -484,7 +481,7 @@ public class QuizAppGui extends Application {
         btnVoltar.setOnAction(e -> {
             Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
             stageAtual.close(); // Fecha a tela de ranking
-            abrirPainelAdmin(); // Volta para o painel admin
+            abrirPainelUsuario(); // Volta para o painel admin
         });
 
 
