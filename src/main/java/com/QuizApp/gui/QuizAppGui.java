@@ -49,6 +49,9 @@ import javafx.collections.ObservableList;
 
 // Classe principal da aplicação gráfica, estendendo Application (JavaFX)
 public class QuizAppGui extends Application {
+	
+	private VBox cadastroPaneGlobal; // declarado no início da classe
+
 
     // Campos de entrada para nome 
     private TextField txtNome;
@@ -87,7 +90,23 @@ public class QuizAppGui extends Application {
 
         StackPane root = new StackPane(conteudo);
 
-        // ------------------- LOGIN PANE -------------------
+        VBox loginPane = criarLoginPane();
+        VBox cadastroPane = criarCadastroPane(loginPane);
+
+        // ------------------- Finalização -------------------
+        conteudo.getChildren().addAll(loginPane, cadastroPane);
+        
+        //inserirQuestoesExemplo(); // <<< Roda uma única vez
+
+
+        Scene scene = new Scene(root, 300, 350);
+        aplicarEstilo(scene);
+        primaryStage.setTitle("Login do Quiz");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+    
+    private VBox criarLoginPane() {
         VBox loginBox = new VBox(5);
         loginBox.setAlignment(Pos.CENTER);
         Label lblLogin = new Label("Login:");
@@ -106,8 +125,20 @@ public class QuizAppGui extends Application {
         inputPane.setAlignment(Pos.CENTER);
 
         Button btnEntrar = new Button("Entrar");
-      
-        //Definição do botão entrar   
+        Button btnCadastrarSe = new Button("Cadastre-se");
+
+        // Centralização real dos botões
+        HBox buttonPane = new HBox(10, btnEntrar, btnCadastrarSe);
+        buttonPane.setAlignment(Pos.CENTER);
+        buttonPane.setMaxWidth(Double.MAX_VALUE); // ocupa o máximo possível
+
+        // (Opcional) Define uma largura mínima para os botões
+        btnEntrar.setPrefWidth(100);
+        btnCadastrarSe.setPrefWidth(100);
+
+        VBox loginPane = new VBox(10, inputPane, buttonPane);
+        loginPane.setAlignment(Pos.CENTER);
+
         btnEntrar.setOnAction(e -> {
             String nome = txtNome.getText().trim();
             String senha = txtSenha.getText().trim();
@@ -116,17 +147,15 @@ public class QuizAppGui extends Application {
                 QuizModel usuario = quizDAO.buscarPorNomeESenha(nome, senha);
 
                 if (usuario != null) {
-                    usuarioLogado = usuario.getNome(); 
-                    
-                    Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
-                    stageAtual.close();
+                    usuarioLogado = usuario.getNome();
+                    ((Stage) ((Node) e.getSource()).getScene().getWindow()).close();
 
                     if (usuario.getAdmin()) {
                         showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como administrador.");
                         abrirPainelAdmin();
                     } else {
                         showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como usuário.");
-                        abrirPainelUsuario(); 
+                        abrirPainelUsuario();
                     }
                 } else {
                     showAlert(Alert.AlertType.ERROR, "Erro", "Usuário ou senha inválidos.");
@@ -136,31 +165,18 @@ public class QuizAppGui extends Application {
             }
         });
 
+        btnCadastrarSe.setOnAction(e -> alternarPanes(cadastroPaneGlobal, loginPane));
 
+        loginPane.setUserData(btnCadastrarSe); // opcional
 
-        
-        Button btnCadastrarSe = new Button("Cadastre-se");
+        return loginPane;
+    }
 
-        HBox buttonPane = new HBox(10, btnEntrar, btnCadastrarSe);
-        buttonPane.setAlignment(Pos.CENTER);
-
-        VBox loginPane = new VBox(10, inputPane, buttonPane);
-        loginPane.setAlignment(Pos.CENTER);
-
-        // ------------------- ENTRAR PANE -------------------
-        VBox EntrarPane = new VBox(10);
-        
-        EntrarPane.setAlignment(Pos.CENTER);
-        EntrarPane.setVisible(false);
-        EntrarPane.setManaged(false); // impede que ocupe espaço quando invisível
-        
-        
-        // ------------------- CADASTRO PANE -------------------
-
+    private VBox criarCadastroPane(VBox loginPane) {
         VBox cadastroPane = new VBox(10);
         cadastroPane.setAlignment(Pos.CENTER);
         cadastroPane.setVisible(false);
-        cadastroPane.setManaged(false); // impede que ocupe espaço quando invisível
+        cadastroPane.setManaged(false);
 
         Label lblNovoLogin = new Label("Novo login:");
         TextField txtNovoLogin = new TextField();
@@ -176,65 +192,44 @@ public class QuizAppGui extends Application {
 
         cadastroPane.getChildren().addAll(lblNovoLogin, txtNovoLogin, lblNovaSenha, txtNovaSenha, chkAdmin, btnCadastrar, btnVoltar);
 
-        // ------------------- Troca de telas -------------------
-        btnCadastrarSe.setOnAction(e -> {
-            loginPane.setVisible(false);
-            loginPane.setManaged(false);
-
-            cadastroPane.setVisible(true);
-            cadastroPane.setManaged(true);
-        });
-
-        btnVoltar.setOnAction(e -> {
-            cadastroPane.setVisible(false);
-            cadastroPane.setManaged(false);
-
-            loginPane.setVisible(true);
-            loginPane.setManaged(true);
-        });
-
-        // ------------------- Ação de cadastro -------------------
         btnCadastrar.setOnAction(e -> {
             String nome = txtNovoLogin.getText().trim();
             String senha = txtNovaSenha.getText().trim();
             boolean admin = chkAdmin.isSelected();
-            
-         // Verifica se os campos obrigatórios estão preenchidos
+
             if (nome.isEmpty() || senha.isEmpty()) {
                 showAlert(Alert.AlertType.WARNING, "Erro", "Preencha todos os campos!");
-                return; // sai da função se tiver algo vazio
+                return;
             }
 
-            // 🚨 Verifica se o nome de login já existe no banco
             if (quizDAO.nomeExiste(nome)) {
-                showAlert(Alert.AlertType.WARNING, "Erro", "Este nome de login já está sendo usado. Escolha outro.");
-                return; // impede o cadastro se o nome já existir
+                showAlert(Alert.AlertType.WARNING, "Erro", "Este nome de login já está sendo usado.");
+                return;
             }
 
             cadastrarUsuario(nome, senha, admin);
-
-            // Limpa os campos e volta para o login
             txtNovoLogin.clear();
             txtNovaSenha.clear();
             chkAdmin.setSelected(false);
-            btnVoltar.fire();
+
+            alternarPanes(loginPane, cadastroPane);
         });
 
+        btnVoltar.setOnAction(e -> alternarPanes(loginPane, cadastroPane));
 
-        // ------------------- Finalização -------------------
-        conteudo.getChildren().addAll(loginPane, cadastroPane);
-        
-        //inserirQuestoesExemplo(); // <<< Roda uma única vez
+        cadastroPaneGlobal = cadastroPane; // guarda para uso no login
 
-
-        Scene scene = new Scene(root, 300, 350);
-        aplicarEstilo(scene);
-        primaryStage.setTitle("Login do Quiz");
-        primaryStage.setScene(scene);
-        primaryStage.show();
+        return cadastroPane;
     }
     
-    
+    private void alternarPanes(Node mostrar, Node esconder) {
+        esconder.setVisible(false);
+        esconder.setManaged(false);
+        mostrar.setVisible(true);
+        mostrar.setManaged(true);
+    }
+
+
     private void iniciarQuiz(String dificuldade, String usuario) {
         Stage quizStage = new Stage();
         quizStage.setTitle("Quiz");
@@ -1032,12 +1027,7 @@ public class QuizAppGui extends Application {
 }
 
 
-
-
-
-
-
-//tempórário
+//tempórário, apenas para inserir questões em massa no banco
 /*private void inserirQuestoesExemplo() {
         List<Questao> lista = new ArrayList<>();
 
