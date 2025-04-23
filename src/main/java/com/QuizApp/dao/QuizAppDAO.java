@@ -61,12 +61,7 @@ public class QuizAppDAO {
         }
     }
 
-    // Método para buscar um objeto pelo seu ID
-    public QuizModel buscarPorId(Long id) {
-        try (Session session = factory.openSession()) {
-            return session.get(QuizModel.class, id); // Retorna o objeto com o ID informado
-        }
-    }
+    
     
     public boolean nomeExiste(String nome) {
         try (Session session = factory.openSession()) {
@@ -78,12 +73,24 @@ public class QuizAppDAO {
             return count != null && count > 0;
         }
     }
-
-
-    // Fecha a SessionFactory quando não for mais necessária (libera recursos)
-    public void close() {
-        factory.close();
+    
+ // Método para buscar um objeto pelo seu ID
+    public QuizModel buscarPorId(Long id) {
+        try (Session session = factory.openSession()) {
+            return session.get(QuizModel.class, id); // Retorna o objeto com o ID informado
+        }
     }
+
+
+    
+    public QuizModel buscarPorNome(String nome) {
+        try (Session session = factory.openSession()) {
+            return session.createQuery("FROM QuizModel WHERE nome = :nome", QuizModel.class)
+                          .setParameter("nome", nome)
+                          .uniqueResult();
+        }
+    }
+
     
     public QuizModel buscarPorNomeESenha(String nome, String senha) {
         try (Session session = factory.openSession()) {
@@ -97,4 +104,8 @@ public class QuizAppDAO {
         }
     }
 
+    // Fecha a SessionFactory quando não for mais necessária (libera recursos)
+    public void close() {
+    	factory.close();
+    }
 }

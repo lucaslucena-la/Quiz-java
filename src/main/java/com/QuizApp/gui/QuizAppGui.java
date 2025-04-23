@@ -284,7 +284,8 @@ public class QuizAppGui extends Application {
             	
             	// Salva no ranking
             	PontuacaoDAO pdao = new PontuacaoDAO();
-            	pdao.salvar(new Pontuacao(usuario, pontos[0], LocalDateTime.now()));
+            	pdao.salvarOuAtualizarPontuacao(usuario, pontos[0]);
+
             	
             	
                 quizStage.close();
@@ -400,7 +401,7 @@ public class QuizAppGui extends Application {
     }
 
     
-    private void abrirRanking() {
+    private void abrirRankingAdmin() {
         Stage stage = new Stage();
         stage.setTitle("Ranking de Pontuação");
 
@@ -421,6 +422,23 @@ public class QuizAppGui extends Application {
         PontuacaoDAO dao = new PontuacaoDAO();
         List<Pontuacao> lista = dao.listarTodas();
         tabela.setItems(FXCollections.observableArrayList(lista));
+        
+        Button btnExcluirRanking = new Button("Excluir do Ranking");
+        btnExcluirRanking.setOnAction(e -> {
+            Pontuacao selecionada = tabela.getSelectionModel().getSelectedItem();
+            if (selecionada != null) {
+                PontuacaoDAO pdao = new PontuacaoDAO();
+                
+                // Exclui diretamente a pontuação selecionada
+                pdao.excluir(selecionada); 
+                
+                tabela.getItems().remove(selecionada);
+                showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Pontuação removida com sucesso.");
+            } else {
+                showAlert(Alert.AlertType.WARNING, "Aviso", "Selecione uma pontuação para excluir.");
+            }
+        });
+
 
         Button btnVoltar = new Button("Voltar");
         btnVoltar.setOnAction(e -> {
@@ -430,7 +448,55 @@ public class QuizAppGui extends Application {
         });
 
 
-        VBox layout = new VBox(10, tabela, btnVoltar);
+        HBox botoes = new HBox(10, btnExcluirRanking, btnVoltar);
+        botoes.setAlignment(Pos.CENTER);
+
+        VBox layout = new VBox(10, tabela, botoes);
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER);
+
+        Scene scene = new Scene(layout, 500, 400);
+        aplicarEstilo(scene);
+
+        stage.setScene(scene);
+        stage.show();
+    }
+    
+    private void abrirRankingUser() {
+        Stage stage = new Stage();
+        stage.setTitle("Ranking de Pontuação");
+
+        TableView<Pontuacao> tabela = new TableView<>();
+        tabela.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<Pontuacao, String> colUsuario = new TableColumn<>("Usuário");
+        colUsuario.setCellValueFactory(new PropertyValueFactory<>("usuario"));
+
+        TableColumn<Pontuacao, Integer> colPontos = new TableColumn<>("Pontuação");
+        colPontos.setCellValueFactory(new PropertyValueFactory<>("pontos"));
+
+        TableColumn<Pontuacao, LocalDateTime> colData = new TableColumn<>("Data");
+        colData.setCellValueFactory(new PropertyValueFactory<>("data"));
+
+        tabela.getColumns().addAll(colUsuario, colPontos, colData);
+
+        PontuacaoDAO dao = new PontuacaoDAO();
+        List<Pontuacao> lista = dao.listarTodas();
+        tabela.setItems(FXCollections.observableArrayList(lista));
+        
+  
+        Button btnVoltar = new Button("Voltar");
+        btnVoltar.setOnAction(e -> {
+            Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            stageAtual.close(); // Fecha a tela de ranking
+            abrirPainelAdmin(); // Volta para o painel admin
+        });
+
+
+        HBox botoes = new HBox(10, btnVoltar);
+        botoes.setAlignment(Pos.CENTER);
+
+        VBox layout = new VBox(10, tabela, botoes);
         layout.setPadding(new Insets(20));
         layout.setAlignment(Pos.CENTER);
 
@@ -455,6 +521,8 @@ public class QuizAppGui extends Application {
         // Criação dos 5 botões do painel admin
         Button btnCadastrarQuestao = new Button("Cadastrar Nova Questão");
         Button btnVisualizarQuestoes = new Button("Visualizar Questões");
+        Button btnGerenciarUsuarios = new Button("Gerenciar Usuários");
+
         Button btnVerRanking = new Button("Ver Ranking");
         Button btnLogout = new Button("Logout");
         Button btnSair = new Button("Sair");
@@ -462,6 +530,7 @@ public class QuizAppGui extends Application {
         // Define uma largura padrão para todos os botões
         btnCadastrarQuestao.setPrefWidth(200);
         btnVisualizarQuestoes.setPrefWidth(200);
+        btnGerenciarUsuarios.setPrefWidth(200);
         btnVerRanking.setPrefWidth(200);
         btnLogout.setPrefWidth(200);
         btnSair.setPrefWidth(200);
@@ -488,6 +557,12 @@ public class QuizAppGui extends Application {
             stageAtual.close();
             abrirVisualizarQuestoes(); // ← Chamada futura para a tela de visualização
         });
+        
+      btnGerenciarUsuarios.setOnAction(e -> {
+    	  Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+    	  stageAtual.close();
+    	  abrirGerenciarUsuarios();
+      });
 
         // Ação do botão "Ver Ranking"
         btnVerRanking.setOnAction(e -> {
@@ -496,7 +571,7 @@ public class QuizAppGui extends Application {
             stageAtual.close();
 
             // Abre a tela de ranking
-            abrirRanking();
+            abrirRankingAdmin();
         });
 
         // Ação do botão "Logout"
@@ -515,6 +590,7 @@ public class QuizAppGui extends Application {
         painel.getChildren().addAll(
             btnCadastrarQuestao,
             btnVisualizarQuestoes,
+            btnGerenciarUsuarios,
             btnVerRanking,
             btnLogout,
             btnSair
@@ -527,7 +603,6 @@ public class QuizAppGui extends Application {
         adminStage.setScene(scene);
         adminStage.show(); // Exibe a nova janela
     }
-
 
  // Método que abre a tela do usuário com seleção de dificuldade e botão para iniciar o quiz
     private void abrirPainelUsuario() {
@@ -543,9 +618,34 @@ public class QuizAppGui extends Application {
         // Botão para iniciar o quiz
         Button btnIniciarQuiz = new Button("Iniciar Quiz");
         btnIniciarQuiz.setDisable(true); // desativado até selecionar uma opção
+        
+     // Ação ao clicar no botão "Iniciar Quiz"
+        btnIniciarQuiz.setOnAction(e -> {
+            String dificuldade = comboBox.getValue();
+            System.out.println("Iniciando quiz na dificuldade: " + dificuldade);
+            iniciarQuiz(dificuldade, usuarioLogado); 
+            userStage.close(); // Fecha a janela atual se quiser
+        });
+        
+        // Ação do botão "Ver Ranking"
+        Button btnVerRanking = new Button("Ver Ranking");
+        btnVerRanking.setOnAction(e -> {
+            // Fecha o painel atual (admin)
+            Stage stageAtual = (Stage) ((Node) e.getSource()).getScene().getWindow();
+            stageAtual.close();
+
+            // Abre a tela de ranking
+            abrirRankingUser();
+        });
+
 
         // Botão "Voltar"
         Button btnVoltar = new Button("Voltar");
+        // Ação ao clicar em "Voltar" → fecha tela e reabre login
+        btnVoltar.setOnAction(e -> {
+        	userStage.close();        // Fecha esta janela
+        	start(new Stage());       // Reabre a tela de login (reusando o método start)
+        });
         
         // Quando o usuário escolher uma dificuldade, habilita o botão
         comboBox.setOnAction(e -> {
@@ -554,27 +654,14 @@ public class QuizAppGui extends Application {
                 btnIniciarQuiz.setDisable(false);
             }
         });
+       
         
-
-        // Ação ao clicar no botão "Iniciar Quiz"
-        btnIniciarQuiz.setOnAction(e -> {
-            String dificuldade = comboBox.getValue();
-            System.out.println("Iniciando quiz na dificuldade: " + dificuldade);
-            iniciarQuiz(dificuldade, usuarioLogado); 
-            userStage.close(); // Fecha a janela atual se quiser
-        });
-        
-     // Ação ao clicar em "Voltar" → fecha tela e reabre login
-        btnVoltar.setOnAction(e -> {
-            userStage.close();        // Fecha esta janela
-            start(new Stage());       // Reabre a tela de login (reusando o método start)
-        });
 
         // Layout da tela
         VBox painel = new VBox(15);
         painel.setPadding(new Insets(20));
         painel.setAlignment(Pos.CENTER);
-        painel.getChildren().addAll(comboBox, btnIniciarQuiz, btnVoltar);
+        painel.getChildren().addAll(comboBox, btnIniciarQuiz,btnVerRanking, btnVoltar);
 
         // Exibe a janela
         Scene scene = new Scene(painel, 300, 200);
@@ -586,6 +673,7 @@ public class QuizAppGui extends Application {
         System.out.println("Painel Usuário aberto.");
     }
 
+   
     private void abrirCadastroQuestoes() {
         Stage cadastroStage = new Stage();
         cadastroStage.setTitle("Cadastrar Nova Questão");
@@ -682,10 +770,13 @@ public class QuizAppGui extends Application {
 
         cadastroStage.setScene(scene);
         cadastroStage.show();
+        
     }
 
     // Método para cadastrar um novo usuário
  // Método para cadastrar um novo usuário (usuário comum ou admin)
+    
+    
     private void cadastrarUsuario(String nome, String senha, boolean admin) {
         if (!nome.isEmpty() && !senha.isEmpty()) {
             try {
@@ -704,6 +795,7 @@ public class QuizAppGui extends Application {
         }
     }
 
+    
     private void abrirVisualizarQuestoes() {
     	Stage stage = new Stage();
         stage.setTitle("Questões Cadastradas");
@@ -859,38 +951,12 @@ public class QuizAppGui extends Application {
 
         stage.setScene(scene);
         stage.show();
+    
     }
 
 
-    private void fazerLogin(String nome, String senha) {
-        if (!nome.isEmpty() && !senha.isEmpty()) {
-            QuizModel usuario = quizDAO.buscarPorNomeESenha(nome, senha);
-
-            if (usuario != null) {
-                if (usuario.getAdmin()) {
-                    showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como administrador.");
-                    primaryStage.close(); // fecha a tela de login
-                    abrirPainelAdmin();
-                    System.out.println("Admin? " + usuario.getAdmin());
-
-                } else {
-                    showAlert(Alert.AlertType.INFORMATION, "Bem-vindo", "Login como usuário.");
-                    primaryStage.close(); // fecha a tela de login
-                    abrirPainelUsuario();
-                    System.out.println("Admin? " + usuario.getAdmin());
-
-                }
-            } else {
-                showAlert(Alert.AlertType.ERROR, "Erro", "Usuário ou senha inválidos.");
-            }
-        } else {
-            showAlert(Alert.AlertType.WARNING, "Aviso", "Preencha todos os campos.");
-        }
-    }
-    // Método para alterar um usuário já existente
-    // Limpa os campos de texto e desmarca seleção da lista
-
-    // Mostra um alerta na tela
+	
+    
     private void showAlert(Alert.AlertType type, String title, String message) {
         Alert alert = new Alert(type);
         alert.setTitle(title);
@@ -899,9 +965,80 @@ public class QuizAppGui extends Application {
         alert.showAndWait();
     }
     
+    private void abrirGerenciarUsuarios() {
+        Stage stage = new Stage();
+        stage.setTitle("Gerenciar Usuários");
+
+        // Tabela de usuários
+        TableView<QuizModel> tabela = new TableView<>();
+        tabela.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<QuizModel, String> colNome = new TableColumn<>("Login");
+        colNome.setCellValueFactory(new PropertyValueFactory<>("nome"));
+
+        tabela.getColumns().addAll(colNome);
+
+        // Dados da tabela (exclui admins se quiser)
+        List<QuizModel> todos = quizDAO.listarTodos();
+        ObservableList<QuizModel> dados = FXCollections.observableArrayList();
+        for (QuizModel u : todos) {
+            if (!u.getAdmin()) { // opcional: mostrar só usuários comuns
+                dados.add(u);
+            }
+        }
+        tabela.setItems(dados);
+
+        // Botões
+        Button btnExcluir = new Button("Excluir Usuário");
+        Button btnVoltar = new Button("Voltar");
+
+        btnExcluir.setOnAction(e -> {
+            QuizModel selecionado = tabela.getSelectionModel().getSelectedItem();
+            if (selecionado != null) {
+                quizDAO.excluir(selecionado);
+                dados.remove(selecionado);
+                showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário excluído.");
+            } else {
+                showAlert(Alert.AlertType.WARNING, "Aviso", "Selecione um usuário.");
+            }
+        });
+
+        btnVoltar.setOnAction(e -> {
+            stage.close();
+            abrirPainelAdmin();
+        });
+
+        HBox botoes = new HBox(10, btnExcluir, btnVoltar);
+        botoes.setAlignment(Pos.CENTER);
+        VBox layout = new VBox(10, tabela, botoes);
+        layout.setPadding(new Insets(20));
+        layout.setAlignment(Pos.CENTER);
+
+        Scene scene = new Scene(layout, 400, 300);
+        aplicarEstilo(scene);
+        stage.setScene(scene);
+        stage.show();
+    } 
+
+    private void aplicarEstilo(Scene scene) {
+    	scene.getStylesheets().add(getClass().getResource("/com/QuizApp/gui/estilo.css").toExternalForm());
+    }
     
-    //tempórário
-    /*private void inserirQuestoesExemplo() {
+   public static void main(String[] args) {
+        launch(args); // Chama o start()
+    }
+    
+
+}
+
+
+
+
+
+
+
+//tempórário
+/*private void inserirQuestoesExemplo() {
         List<Questao> lista = new ArrayList<>();
 
         lista.add(new Questao("Qual a capital do Brasil?", "São Paulo", "Rio de Janeiro", "Brasília", "Belo Horizonte", "C", "Fácil"));
@@ -920,15 +1057,3 @@ public class QuizAppGui extends Application {
 
         showAlert(Alert.AlertType.INFORMATION, "Sucesso", "10 questões adicionadas ao banco!");
     }*/
-
-
-    // Método principal que inicia a aplicação
-    public static void main(String[] args) {
-        launch(args); // Chama o start()
-    }
-    
-    private void aplicarEstilo(Scene scene) {
-        scene.getStylesheets().add(getClass().getResource("/com/QuizApp/gui/estilo.css").toExternalForm());
-    }
-
-}
