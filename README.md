@@ -67,3 +67,10 @@ Se tudo estiver correto, o aplicativo JavaFX será aberto.
 - JDK 21: https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html
 - Maven: https://maven.apache.org/download.cgi
 - JavaFX: https://gluonhq.com/products/javafx/
+
+## 👨‍💻 Autor
+
+Feito com 💻 por **Lucas Lucena**  
+📫 Entre em contato no [LinkedIn](https://www.linkedin.com/in/lucaslucenadev)
+
+---
